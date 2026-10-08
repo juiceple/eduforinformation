@@ -1,122 +1,85 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { getItem, ITEMS } from "@/lib/content";
-import { isDue, streak, useProgress } from "@/lib/progress";
-import { AppCtx, type Ctx, type Nav, type View } from "./AppContext";
-import Cloze from "./Cloze";
-import Codes from "./Codes";
-import Flashcards from "./Flashcards";
+import { useCallback, useEffect, useState } from "react";
+import { getCluster, getItem, itemsOfCluster } from "@/lib/content";
+import { useProgress } from "@/lib/progress";
+import type { SubjectId } from "@/lib/types";
 import Home from "./Home";
-import ItemCard from "./ItemCard";
-import MapView from "./MapView";
-import Quiz from "./Quiz";
 import Study from "./Study";
+import SubjectScreen from "./SubjectScreen";
 
-const TABS: { id: View; label: string }[] = [
-  { id: "home", label: "🏠 학습법" },
-  { id: "study", label: "📚 묶음 학습" },
-  { id: "cards", label: "🃏 플래시카드" },
-  { id: "cloze", label: "✍️ 빈칸 채우기" },
-  { id: "quiz", label: "🎯 객관식" },
-  { id: "map", label: "🕸️ 연관 맵" },
-  { id: "codes", label: "🔑 암기 코드" },
-];
+/** 홈(과목) → 묶음 목록 → 학습 3단계. 주소: #/ · #/s/1 · #/i/12 */
+type Route = { screen: "home" } | { screen: "subject"; id: SubjectId } | { screen: "study"; n: number };
 
-function parseHash(): Nav {
-  if (typeof window === "undefined") return { view: "home" };
-  const [view, cluster] = window.location.hash.replace(/^#\/?/, "").split("/");
-  if (TABS.some((t) => t.id === view)) return { view: view as View, cluster: cluster || undefined };
-  return { view: "home" };
+function parseHash(): Route {
+  const [kind, arg] = window.location.hash.replace(/^#\/?/, "").split("/");
+  if (kind === "s" && ["1", "2", "3"].includes(arg)) return { screen: "subject", id: Number(arg) as SubjectId };
+  if (kind === "i" && getItem(Number(arg))) return { screen: "study", n: Number(arg) };
+  return { screen: "home" };
+}
+
+function toHash(r: Route): string {
+  if (r.screen === "subject") return `#/s/${r.id}`;
+  if (r.screen === "study") return `#/i/${r.n}`;
+  return "#/";
 }
 
 export default function App() {
-  const { progress, ready, grade, reset } = useProgress();
-  const [nav, setNav] = useState<Nav>({ view: "home" });
-  const [modal, setModal] = useState<number | null>(null);
+  const { progress, ready, markDone } = useProgress();
+  const [route, setRoute] = useState<Route>({ screen: "home" });
 
   useEffect(() => {
-    setNav(parseHash());
-    const onHash = () => setNav((prev) => ({ ...parseHash(), scope: prev.scope }));
+    setRoute(parseHash());
+    const onHash = () => setRoute(parseHash());
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
-  const go = useCallback((next: Nav) => {
-    setNav(next);
-    setModal(null);
-    const hash = `#/${next.view}${next.cluster ? `/${next.cluster}` : ""}`;
+  const go = useCallback((next: Route) => {
+    const screenChanged = next.screen !== route.screen;
+    setRoute(next);
+    const hash = toHash(next);
     if (window.location.hash !== hash) window.history.pushState(null, "", hash);
-    window.scrollTo({ top: 0 });
-  }, []);
+    if (screenChanged) window.scrollTo({ top: 0 });
+  }, [route.screen]);
 
-  useEffect(() => {
-    if (modal === null) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setModal(null);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [modal]);
+  const openItem = useCallback((n: number) => go({ screen: "study", n }), [go]);
 
-  const ctx: Ctx = useMemo(
-    () => ({ progress, ready, grade, reset, go, openItem: setModal }),
-    [progress, ready, grade, reset, go],
+  /** 묶음을 열면 아직 ‘알아요’ 표시 안 한 첫 항목부터 */
+  const openCluster = useCallback(
+    (id: string) => {
+      const items = itemsOfCluster(id);
+      const first = items.find((it) => !progress.done[it.n]) ?? items[0];
+      if (first) openItem(first.n);
+    },
+    [progress.done, openItem],
   );
 
-  const now = Date.now();
-  const due = ITEMS.filter((it) => isDue(progress.map[it.n], now)).length;
-  const seen = Object.keys(progress.map).length;
-  const days = streak(progress.days);
-  const modalItem = modal !== null ? getItem(modal) : undefined;
+  if (!ready) return <div className="loading">불러오는 중…</div>;
 
   return (
-    <AppCtx.Provider value={ctx}>
-      <header className="topbar">
-        <div className="topbar-inner">
-          <div className="brand">
-            <h1>
-              정처산기 <span>연관 암기</span>
-            </h1>
-            {ready && (
-              <div className="stats-mini">
-                <span>복습 <b>{due}</b></span>
-                <span>학습 <b>{seen}</b>/200</span>
-                <span>🔥 <b>{days}</b>일</span>
-              </div>
-            )}
-          </div>
-          <nav className="tabs" aria-label="학습 메뉴">
-            {TABS.map((t) => (
-              <button key={t.id} className={`tab ${nav.view === t.id ? "active" : ""}`} onClick={() => go({ view: t.id })}>
-                {t.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-      </header>
-
-      <main className="shell">
-        {nav.view === "home" && <Home />}
-        {nav.view === "study" && <Study clusterId={nav.cluster} />}
-        {nav.view === "cards" && <Flashcards initial={nav.scope} />}
-        {nav.view === "cloze" && <Cloze initial={nav.scope} />}
-        {nav.view === "quiz" && <Quiz initial={nav.scope} />}
-        {nav.view === "map" && <MapView />}
-        {nav.view === "codes" && <Codes />}
-      </main>
-
-      {modalItem && (
-        <div className="overlay" onClick={() => setModal(null)} role="dialog" aria-modal="true">
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="row" style={{ justifyContent: "flex-end", marginBottom: 8 }}>
-              <button className="btn sm" onClick={() => go({ view: "study", cluster: modalItem.c })}>
-                이 묶음으로 이동
-              </button>
-              <button className="btn sm" onClick={() => setModal(null)}>닫기 ✕</button>
-            </div>
-            <ItemCard key={modalItem.n} item={modalItem} showCluster />
-          </div>
-        </div>
+    <main className="shell">
+      {route.screen === "home" && (
+        <Home done={progress.done} openSubject={(id) => go({ screen: "subject", id })} openItem={openItem} />
       )}
-    </AppCtx.Provider>
+      {route.screen === "subject" && (
+        <SubjectScreen
+          subject={route.id}
+          done={progress.done}
+          goHome={() => go({ screen: "home" })}
+          openCluster={openCluster}
+          openItem={openItem}
+        />
+      )}
+      {route.screen === "study" && (
+        <Study
+          n={route.n}
+          done={progress.done}
+          markDone={markDone}
+          openItem={openItem}
+          back={() => go({ screen: "subject", id: getCluster(getItem(route.n)!.c).subject })}
+        />
+      )}
+    </main>
   );
 }

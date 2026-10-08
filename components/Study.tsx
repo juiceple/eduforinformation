@@ -1,137 +1,289 @@
 "use client";
 
-import { useState } from "react";
-import { CLUSTERS, getCluster, getItem, itemsOfCluster, SUBJECTS } from "@/lib/content";
-import { useApp } from "./AppContext";
-import ItemCard from "./ItemCard";
+import { useMemo, useState } from "react";
+import { getCluster, getItem, itemsOfCluster, itemsOfSubject, segments, shuffle } from "@/lib/content";
+import type { Item } from "@/lib/types";
 
-/** 이 묶음과 연결 고리(r)로 이어진 다른 묶음들 */
-function linkedClusters(id: string): { id: string; count: number }[] {
-  const counts = new Map<string, number>();
-  for (const it of itemsOfCluster(id)) {
-    for (const n of it.r) {
-      const other = getItem(n);
-      if (other && other.c !== id) counts.set(other.c, (counts.get(other.c) ?? 0) + 1);
-    }
-  }
-  return [...counts.entries()].map(([id, count]) => ({ id, count })).sort((a, b) => b.count - a.count);
-}
+type Mode = "flash" | "cloze" | "quiz";
 
-export default function Study({ clusterId }: { clusterId?: string }) {
-  const { progress, go } = useApp();
-  const [hide, setHide] = useState(false);
-  const [hooks, setHooks] = useState(true);
-  const cluster = getCluster(clusterId && CLUSTERS.some((c) => c.id === clusterId) ? clusterId : CLUSTERS[0].id);
+const MODES: { id: Mode; label: string }[] = [
+  { id: "flash", label: "플래시카드" },
+  { id: "cloze", label: "빈칸채우기" },
+  { id: "quiz", label: "객관식" },
+];
+
+export default function Study({
+  n,
+  done,
+  markDone,
+  openItem,
+  back,
+}: {
+  n: number;
+  done: Record<number, boolean>;
+  markDone: (n: number, known: boolean) => void;
+  openItem: (n: number) => void;
+  back: () => void;
+}) {
+  const [mode, setMode] = useState<Mode>("flash");
+  const item = getItem(n)!;
+  const cluster = getCluster(item.c);
   const items = itemsOfCluster(cluster.id);
-  const idx = CLUSTERS.findIndex((c) => c.id === cluster.id);
-  const prev = CLUSTERS[idx - 1];
-  const next = CLUSTERS[idx + 1];
-  const linked = linkedClusters(cluster.id);
+  const idx = items.findIndex((it) => it.n === n);
+  const prev = items[idx - 1];
+  const next = items[idx + 1];
+  const state = done[n];
+  const related = item.r.map(getItem).filter((it): it is Item => !!it);
 
   return (
-    <div className="study">
-      <aside className="side" aria-label="묶음 목록">
-        {SUBJECTS.map((s) => (
-          <div key={s.id}>
-            <h4>{s.id}과목 · {s.name}</h4>
-            {CLUSTERS.filter((c) => c.subject === s.id).map((c) => {
-              const its = itemsOfCluster(c.id);
-              const done = its.filter((it) => (progress.map[it.n]?.box ?? 0) >= 1).length;
+    <div className="screen">
+      <button className="back" onClick={back}>
+        ← {cluster.name}
+      </button>
+
+      <div className="chips study">
+        {items.map((it) => (
+          <button
+            key={it.n}
+            className={`chip ${it.n === n ? "active" : done[it.n] ? "done" : ""}`}
+            onClick={() => openItem(it.n)}
+            title={it.t}
+            aria-current={it.n === n ? "true" : undefined}
+          >
+            {it.n}
+          </button>
+        ))}
+      </div>
+
+      <div className="study-bar">
+        <div className="modes" role="tablist">
+          {MODES.map((m) => (
+            <button
+              key={m.id}
+              role="tab"
+              aria-selected={mode === m.id}
+              className={`mode ${mode === m.id ? "active" : ""}`}
+              onClick={() => setMode(m.id)}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        <div className="counter">
+          {idx + 1} / {items.length}
+        </div>
+      </div>
+
+      <div className="panel">
+        {/* 항목이나 모드가 바뀌면 카드 뒤집기·빈칸·힌트·객관식 상태를 새로 시작 */}
+        {mode === "flash" && <Flash key={n} item={item} />}
+        {mode === "cloze" && <Cloze key={n} item={item} />}
+        {mode === "quiz" && <Quiz key={n} item={item} />}
+      </div>
+
+      <div className="study-foot">
+        <div className="row">
+          {prev && (
+            <button className="nav-btn" onClick={() => openItem(prev.n)}>
+              ← 이전
+            </button>
+          )}
+          {next && (
+            <button className="nav-btn" onClick={() => openItem(next.n)}>
+              다음 →
+            </button>
+          )}
+        </div>
+        <div className="row">
+          <button className={`mark know ${state === true ? "on" : ""}`} onClick={() => markDone(n, true)} aria-pressed={state === true}>
+            👍 알아요
+          </button>
+          <button className={`mark again ${state === false ? "on" : ""}`} onClick={() => markDone(n, false)} aria-pressed={state === false}>
+            🔁 다시 볼게요
+          </button>
+        </div>
+      </div>
+
+      {related.length > 0 && (
+        <div className="related">
+          <div className="related-label">🔗 연결해서 보기</div>
+          <div className="related-list">
+            {related.map((it) => (
+              <button key={it.n} className="related-chip" onClick={() => openItem(it.n)}>
+                {it.n}. {it.t}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Lines({ item, hidden, onReveal, cloze }: { item: Item; hidden?: (key: string) => boolean; onReveal?: (key: string) => void; cloze?: boolean }) {
+  return (
+    <ul className={`lines ${cloze ? "cloze" : ""}`}>
+      {item.p.map((line, li) => {
+        let bi = 0;
+        return (
+          <li key={li}>
+            <span>
+              {segments(line).map((s, si) => {
+                if (!s.key) return <span key={si}>{s.text}</span>;
+                const key = `${li}-${bi++}`;
+                if (hidden?.(key))
+                  return (
+                    <button key={si} className="blank" onClick={() => onReveal?.(key)} aria-label="빈칸 — 눌러서 보기">
+                      {s.text}
+                    </button>
+                  );
+                return (
+                  <span key={si} className="kw">
+                    {s.text}
+                  </span>
+                );
+              })}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function Flash({ item }: { item: Item }) {
+  const [flipped, setFlipped] = useState(false);
+  return (
+    <div
+      className="flash"
+      role="button"
+      tabIndex={0}
+      aria-expanded={flipped}
+      onClick={() => setFlipped((f) => !f)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setFlipped((f) => !f);
+        }
+      }}
+    >
+      {!flipped ? (
+        <div className="flash-front">
+          <div className="flash-no">No. {item.n}</div>
+          <div className="flash-title serif">{item.t}</div>
+          <div className="flash-tap">탭해서 내용 보기 →</div>
+        </div>
+      ) : (
+        <div>
+          <h2 className="item-title serif">{item.t}</h2>
+          <Lines item={item} />
+          {item.ex && <div className="example">{item.ex}</div>}
+          <div className="hook">
+            <b>💡 암기 훅&nbsp; </b>
+            {item.m}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Cloze({ item }: { item: Item }) {
+  const [revealed, setRevealed] = useState<Set<string>>(new Set());
+  const [hintOpen, setHintOpen] = useState(false);
+
+  const toggle = (key: string) =>
+    setRevealed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const revealAll = () => {
+    const all = new Set<string>();
+    item.p.forEach((line, li) => segments(line).filter((s) => s.key).forEach((_, bi) => all.add(`${li}-${bi}`)));
+    setRevealed(all);
+  };
+
+  return (
+    <div>
+      <div className="cloze-head">
+        <h2 className="item-title serif">{item.t}</h2>
+        <button className="link" onClick={revealAll}>
+          전체 보기
+        </button>
+      </div>
+      <Lines item={item} cloze hidden={(k) => !revealed.has(k)} onReveal={toggle} />
+      <button className="hint-toggle" onClick={() => setHintOpen((o) => !o)} aria-expanded={hintOpen}>
+        {hintOpen ? "🔽 암기 힌트 숨기기" : "▶️ 암기 힌트 보기"}
+      </button>
+      {hintOpen && <div className="hook">{item.m}</div>}
+    </div>
+  );
+}
+
+interface BlankQuiz {
+  li: number;
+  bi: number;
+  answer: string;
+  choices: string[];
+}
+
+/** 밑줄 키워드가 있는 첫 줄에서 하나를 가리고, 같은 과목의 다른 키워드 3개를 오답으로 섞는다. */
+function makeQuiz(item: Item): BlankQuiz | null {
+  const li = item.p.findIndex((line) => segments(line).some((s) => s.key));
+  if (li < 0) return null;
+  const blanks = segments(item.p[li]).filter((s) => s.key);
+  const bi = Math.floor(Math.random() * blanks.length);
+  const answer = blanks[bi].text;
+  const pool = new Set<string>();
+  for (const it of itemsOfSubject(getCluster(item.c).subject))
+    for (const line of it.p) for (const s of segments(line)) if (s.key && s.text !== answer) pool.add(s.text);
+  const choices = shuffle([answer, ...shuffle([...pool]).slice(0, 3)]);
+  return { li, bi, answer, choices };
+}
+
+function Quiz({ item }: { item: Item }) {
+  const quiz = useMemo(() => makeQuiz(item), [item]);
+  const [selected, setSelected] = useState<string | null>(null);
+
+  return (
+    <div>
+      <h2 className="quiz-q serif">No. {item.n} — 빈칸에 들어갈 말은?</h2>
+      {!quiz ? (
+        <div className="quiz-none">이 항목은 객관식 문제를 만들 수 없어요. 플래시카드로 학습해보세요.</div>
+      ) : (
+        <>
+          <div className="quiz-line">
+            {(() => {
+              let bi = 0;
+              return segments(item.p[quiz.li]).map((s, si) => {
+                if (!s.key) return <span key={si}>{s.text}</span>;
+                if (bi++ !== quiz.bi) return <span key={si} className="kw">{s.text}</span>;
+                if (!selected) return <span key={si} className="q-mask">?????</span>;
+                return (
+                  <span key={si} className={selected === quiz.answer ? "q-right" : "q-wrong"}>
+                    {s.text}
+                  </span>
+                );
+              });
+            })()}
+          </div>
+          <div className="choices">
+            {quiz.choices.map((c) => {
+              const cls = !selected ? "" : c === quiz.answer ? "correct" : c === selected ? "wrong" : "dim";
               return (
-                <button
-                  key={c.id}
-                  className={`side-btn ${c.id === cluster.id ? "active" : ""}`}
-                  onClick={() => go({ view: "study", cluster: c.id })}
-                >
-                  <span>{c.emoji}</span>
-                  <span>{c.name}</span>
-                  <small>{done}/{its.length}</small>
+                <button key={c} className={`choice ${cls}`} disabled={!!selected} onClick={() => setSelected(c)}>
+                  {c}
+                  {cls === "correct" && " ✓"}
+                  {cls === "wrong" && " ✗"}
                 </button>
               );
             })}
           </div>
-        ))}
-      </aside>
-
-      <section>
-        <select
-          className="select select-mobile"
-          value={cluster.id}
-          onChange={(e) => go({ view: "study", cluster: e.target.value })}
-          aria-label="묶음 선택"
-        >
-          {SUBJECTS.map((s) => (
-            <optgroup key={s.id} label={`${s.id}과목 ${s.name}`}>
-              {CLUSTERS.filter((c) => c.subject === s.id).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.emoji} {c.name}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-
-        <div className="story">
-          <p className="small muted" style={{ marginBottom: 4 }}>
-            {cluster.subject}과목 · 묶음 {idx + 1}/{CLUSTERS.length} · {items.length}개 항목
-          </p>
-          <h2>
-            {cluster.emoji} {cluster.name}
-          </h2>
-          <p>📖 {cluster.story}</p>
-          {linked.length > 0 && (
-            <div className="related" style={{ marginTop: 12 }}>
-              <span className="small muted">이어지는 묶음</span>
-              {linked.slice(0, 6).map((l) => (
-                <button key={l.id} className="chip" onClick={() => go({ view: "study", cluster: l.id })}>
-                  {getCluster(l.id).emoji} {getCluster(l.id).name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="row" style={{ marginBottom: 14 }}>
-          <button className={`btn sm ${hide ? "primary" : ""}`} onClick={() => setHide((h) => !h)}>
-            {hide ? "🙈 키워드 가리는 중" : "🙈 키워드 가리기"}
-          </button>
-          <button className={`btn sm ${!hooks ? "primary" : ""}`} onClick={() => setHooks((h) => !h)}>
-            {hooks ? "💡 암기 훅 숨기기" : "💡 암기 훅 보기"}
-          </button>
-          <span className="spacer" />
-          <button className="btn sm" onClick={() => go({ view: "cloze", scope: { kind: "cluster", id: cluster.id } })}>
-            ✍️ 이 묶음 빈칸
-          </button>
-          <button className="btn sm" onClick={() => go({ view: "cards", scope: { kind: "cluster", id: cluster.id } })}>
-            🃏 이 묶음 카드
-          </button>
-        </div>
-        {hide && (
-          <p className="small muted" style={{ marginBottom: 12 }}>
-            분홍 빈칸을 한 번 누르면 초성 힌트, 한 번 더 누르면 정답이 보입니다. 떠올린 뒤 아래 버튼으로 스스로 체크하세요.
-          </p>
-        )}
-
-        <div className="grid">
-          {items.map((it) => (
-            <ItemCard key={`${it.n}-${hide}`} item={it} hide={hide} showHook={hooks} showGrade />
-          ))}
-        </div>
-
-        <div className="row" style={{ marginTop: 20 }}>
-          {prev && (
-            <button className="btn" onClick={() => go({ view: "study", cluster: prev.id })}>
-              ← {prev.emoji} {prev.name}
-            </button>
-          )}
-          <span className="spacer" />
-          {next && (
-            <button className="btn primary" onClick={() => go({ view: "study", cluster: next.id })}>
-              {next.emoji} {next.name} →
-            </button>
-          )}
-        </div>
-      </section>
+        </>
+      )}
     </div>
   );
 }

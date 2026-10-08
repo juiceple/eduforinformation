@@ -28,9 +28,21 @@ export interface Progress {
   map: ProgressMap;
   /** 오늘 공부한 날짜 기록 (연속 학습일 계산용) */
   days: string[];
+  /** 학습 화면의 ‘알아요(true) / 다시 볼게요(false)’ 표시. 없으면 아직 표시 안 함 */
+  done: Record<number, boolean>;
 }
 
-const empty: Progress = { map: {}, days: [] };
+const empty: Progress = { map: {}, days: [], done: {} };
+
+/** done 기록이 없던 이전 버전 데이터: 상자 2 이상은 ‘알아요’, 상자 1은 ‘다시 볼게요’로 옮긴다. */
+function migrateDone(map: ProgressMap): Record<number, boolean> {
+  const done: Record<number, boolean> = {};
+  for (const [n, s] of Object.entries(map)) {
+    if (s.box >= 2) done[Number(n)] = true;
+    else if (s.box === 1) done[Number(n)] = false;
+  }
+  return done;
+}
 
 export function today(): string {
   const d = new Date();
@@ -69,8 +81,9 @@ function load(): Progress {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return empty;
-    const parsed = JSON.parse(raw) as Progress;
-    return { map: parsed.map ?? {}, days: parsed.days ?? [] };
+    const parsed = JSON.parse(raw) as Partial<Progress>;
+    const map = parsed.map ?? {};
+    return { map, days: parsed.days ?? [], done: parsed.done ?? migrateDone(map) };
   } catch {
     return empty;
   }
@@ -97,8 +110,23 @@ export function useProgress() {
     setProgress((prev) => {
       const t = today();
       const next: Progress = {
+        ...prev,
         map: { ...prev.map, [n]: nextState(prev.map[n], g) },
         days: prev.days.includes(t) ? prev.days : [...prev.days, t].slice(-400),
+      };
+      save(next);
+      return next;
+    });
+  }, []);
+
+  /** ‘알아요 / 다시 볼게요’. 간격 반복 기록도 같이 남겨서 나중에 복습 기능을 다시 붙일 수 있게 한다. */
+  const markDone = useCallback((n: number, known: boolean) => {
+    setProgress((prev) => {
+      const t = today();
+      const next: Progress = {
+        map: { ...prev.map, [n]: nextState(prev.map[n], known ? "good" : "again") },
+        days: prev.days.includes(t) ? prev.days : [...prev.days, t].slice(-400),
+        done: { ...prev.done, [n]: known },
       };
       save(next);
       return next;
@@ -110,7 +138,7 @@ export function useProgress() {
     setProgress(empty);
   }, []);
 
-  return { progress, ready, grade, reset };
+  return { progress, ready, grade, markDone, reset };
 }
 
 export function streak(days: string[]): number {
