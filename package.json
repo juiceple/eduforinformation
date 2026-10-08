@@ -1,0 +1,24 @@
+{
+  "name": "eduforinformation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "정보처리산업기사 핵심 요약 200 — 연관 암기 학습 사이트",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "check:data": "node --experimental-strip-types --no-warnings scripts/check-data.ts"
+  },
+  "dependencies": {
+    "next": "^16.4.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^5.9.2"
+  }
+}

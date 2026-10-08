@@ -1,0 +1,34 @@
+export type SubjectId = 1 | 2 | 3;
+
+/** 교재 한 항목. 본문의 [[키워드]]는 교재 밑줄(핵심어)로, 빈칸 퀴즈 정답이 된다. */
+export interface Item {
+  /** 교재 번호 (001~200) */
+  n: number;
+  /** 제목 */
+  t: string;
+  /** 연관 묶음 id */
+  c: string;
+  /** 본문 포인트 */
+  p: string[];
+  /** 예제·보충 풀이 */
+  ex?: string;
+  /** 암기 훅 (두문자·비유·연결) */
+  m: string;
+  /** 연결해서 같이 볼 항목 번호 */
+  r: number[];
+}
+
+export interface Cluster {
+  id: string;
+  subject: SubjectId;
+  name: string;
+  emoji: string;
+  /** 묶음 전체를 한 흐름으로 꿰는 이야기 */
+  story: string;
+}
+
+export interface Subject {
+  id: SubjectId;
+  name: string;
+  range: [number, number];
+}
