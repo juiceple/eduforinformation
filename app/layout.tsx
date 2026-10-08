@@ -2,22 +2,27 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "정처산기 연관 암기",
-  description: "정보처리산업기사 핵심 요약 200개를 연관 묶음·암기 훅·간격 반복으로 외우는 학습 사이트",
+  title: "정처기 학습노트",
+  description: "정보처리산업기사 핵심 200문항을 과목 → 묶음 → 플래시카드·빈칸·객관식으로 외우는 학습노트",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f7f8fb" },
-    { media: "(prefers-color-scheme: dark)", color: "#12141a" },
-  ],
+  themeColor: "#faf5ef",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap"
+        />
+      </head>
       <body>{children}</body>
     </html>
   );
