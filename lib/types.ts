@@ -52,3 +52,13 @@ export interface ExamQ {
   anyOrder?: boolean;
   ex?: string;
 }
+
+/** 화면에 보여줄 요약노트 (notes/*.md를 빌드 때 HTML로 변환) */
+export interface NoteDoc {
+  id: number;
+  name: string;
+  emoji: string;
+  html: string;
+  /** ## 제목 목차 */
+  toc: { id: string; text: string }[];
+}
