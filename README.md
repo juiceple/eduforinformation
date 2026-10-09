@@ -13,7 +13,7 @@
 | 3 | 학습 | 묶음 안 항목을 플래시카드 · 빈칸채우기 · 객관식으로. 암기 훅·연결 항목은 카드 안에 |
 
 학습 화면의 ‘👍 알아요 / 🔁 다시 볼게요’는 진행률에 반영되고, 라이트너 간격 반복 기록(`map`)도 함께 남깁니다.
-학습 기록은 브라우저 `localStorage`(`edu-info-progress-v1`)에만 저장됩니다(서버·로그인 없음).
+학습 기록은 누를 때마다 웹(Supabase `edu_progress` 테이블, 행 `me`)에 자동 저장되고, 브라우저 `localStorage`(`edu-info-progress-v1`)에도 사본을 둡니다. 혼자 쓰는 사이트라 로그인은 없고, 기기 간에는 더 최근 기록이 이깁니다.
 
 ## 개발
 
@@ -34,4 +34,4 @@ npm run build
 
 ## 배포 (Vercel)
 
-저장소를 Vercel에 Import하면 Next.js로 자동 인식됩니다. 별도 환경 변수는 필요 없습니다.
+저장소를 Vercel에 Import하면 Next.js로 자동 인식됩니다. 별도 환경 변수는 필요 없습니다(다른 Supabase를 쓰려면 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_KEY`).
