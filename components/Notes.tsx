@@ -8,6 +8,9 @@ export function NoteList({ notes, openNote }: { notes: NoteDoc[]; openNote: (id:
     <div className="screen">
       <h1 className="screen-title serif">🗒️ 실기 총요약 요약노트</h1>
       <p className="exam-lead">정보처리산업기사 실기 총요약을 정리하고, 빠진 부분은 [보충]으로 채운 노트예요.</p>
+      <button className="nav-btn note-print-btn" onClick={() => window.print()}>
+        🖨️ 요약노트 전체 인쇄
+      </button>
       <div className="clusters">
         {notes.map((n) => (
           <button key={n.id} className="result note-card" onClick={() => openNote(n.id)}>
@@ -20,6 +23,12 @@ export function NoteList({ notes, openNote }: { notes: NoteDoc[]; openNote: (id:
             </span>
             <span className="exam-entry-go">→</span>
           </button>
+        ))}
+      </div>
+      {/* 화면에는 숨기고 인쇄할 때만 세 편을 이어서 출력 */}
+      <div className="print-only">
+        {notes.map((n) => (
+          <article key={n.id} className="note note-print-page" dangerouslySetInnerHTML={{ __html: n.html }} />
         ))}
       </div>
     </div>
@@ -45,9 +54,14 @@ export function NoteView({
 
   return (
     <div className="screen">
-      <button className="back" onClick={back}>
-        ← 요약노트 목록
-      </button>
+      <div className="note-head">
+        <button className="back" onClick={back}>
+          ← 요약노트 목록
+        </button>
+        <button className="nav-btn" onClick={() => window.print()}>
+          🖨️ 인쇄
+        </button>
+      </div>
       <div className="note-toc">
         {note.toc.map((t) => (
           <button key={t.id} className="related-chip" onClick={() => jump(t.id)}>
