@@ -2,6 +2,7 @@
 import { CLUSTERS } from "../lib/clusters.ts";
 import { ITEMS1 } from "../lib/items1.ts";
 import { ITEMS2 } from "../lib/items2.ts";
+import { EXAM, EXAM_SETS, isCorrect } from "../lib/exam.ts";
 
 const items = [...ITEMS1, ...ITEMS2];
 const errors: string[] = [];
@@ -22,6 +23,17 @@ for (const it of items) {
 }
 for (const c of CLUSTERS) if (!items.some((i) => i.c === c.id)) errors.push(`empty cluster ${c.id}`);
 const blanks = items.reduce((s, it) => s + it.p.join("").split("[[").length - 1, 0);
+// 실기 요약 테스트: id 중복, 범위, 인정 답안이 스스로 채점을 통과하는지
+const examIds = new Set<string>();
+for (const q of EXAM) {
+  if (examIds.has(q.id)) errors.push(`exam ${q.id}: duplicate id`);
+  examIds.add(q.id);
+  if (!EXAM_SETS.some((s) => s.id === q.set)) errors.push(`exam ${q.id}: unknown set ${q.set}`);
+  if (!q.a.length) errors.push(`exam ${q.id}: no answer`);
+  for (const a of q.a) if (!isCorrect(q, a)) errors.push(`exam ${q.id}: answer "${a}" fails its own check`);
+}
+for (const s of EXAM_SETS) if (!EXAM.some((q) => q.set === s.id)) errors.push(`exam set ${s.id} is empty`);
+console.log(`exam=${EXAM.length}`);
 console.log(`items=${items.length} clusters=${CLUSTERS.length} blanks=${blanks}`);
 if (errors.length) {
   console.error(errors.join("\n"));

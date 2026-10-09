@@ -4,23 +4,26 @@ import { useCallback, useEffect, useState } from "react";
 import { getCluster, getItem, itemsOfCluster } from "@/lib/content";
 import { useProgress } from "@/lib/progress";
 import type { SubjectId } from "@/lib/types";
+import Exam from "./Exam";
 import Home from "./Home";
 import Study from "./Study";
 import SubjectScreen from "./SubjectScreen";
 
-/** 홈(과목) → 묶음 목록 → 학습 3단계. 주소: #/ · #/s/1 · #/i/12 */
-type Route = { screen: "home" } | { screen: "subject"; id: SubjectId } | { screen: "study"; n: number };
+/** 홈(과목) → 묶음 목록 → 학습 3단계 + 따로 떨어진 실기 요약 테스트. 주소: #/ · #/s/1 · #/i/12 · #/exam */
+type Route = { screen: "home" } | { screen: "subject"; id: SubjectId } | { screen: "study"; n: number } | { screen: "exam" };
 
 function parseHash(): Route {
   const [kind, arg] = window.location.hash.replace(/^#\/?/, "").split("/");
   if (kind === "s" && ["1", "2", "3"].includes(arg)) return { screen: "subject", id: Number(arg) as SubjectId };
   if (kind === "i" && getItem(Number(arg))) return { screen: "study", n: Number(arg) };
+  if (kind === "exam") return { screen: "exam" };
   return { screen: "home" };
 }
 
 function toHash(r: Route): string {
   if (r.screen === "subject") return `#/s/${r.id}`;
   if (r.screen === "study") return `#/i/${r.n}`;
+  if (r.screen === "exam") return "#/exam";
   return "#/";
 }
 
@@ -57,10 +60,26 @@ export default function App() {
 
   if (!ready) return <div className="loading">불러오는 중…</div>;
 
+  const inExam = route.screen === "exam";
+
   return (
     <main className="shell">
+      {/* 어느 화면에서든 학습노트 ↔ 실기 테스트로 바로 이동 */}
+      <nav className="topnav" aria-label="주 메뉴">
+        <button className={`topnav-tab ${!inExam ? "on" : ""}`} onClick={() => go({ screen: "home" })} aria-current={!inExam ? "page" : undefined}>
+          📖 학습노트
+        </button>
+        <button className={`topnav-tab ${inExam ? "on" : ""}`} onClick={() => go({ screen: "exam" })} aria-current={inExam ? "page" : undefined}>
+          📝 실기 테스트
+        </button>
+      </nav>
       {route.screen === "home" && (
-        <Home done={progress.done} openSubject={(id) => go({ screen: "subject", id })} openItem={openItem} />
+        <Home
+          done={progress.done}
+          openSubject={(id) => go({ screen: "subject", id })}
+          openItem={openItem}
+          openExam={() => go({ screen: "exam" })}
+        />
       )}
       {route.screen === "subject" && (
         <SubjectScreen
@@ -71,6 +90,7 @@ export default function App() {
           openItem={openItem}
         />
       )}
+      {route.screen === "exam" && <Exam goHome={() => go({ screen: "home" })} />}
       {route.screen === "study" && (
         <Study
           n={route.n}
