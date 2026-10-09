@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { shuffle } from "@/lib/content";
 import { answerOf, EXAM, EXAM_SETS, isCorrect } from "@/lib/exam";
+import type { HistoryApi } from "@/lib/history";
 import type { ExamQ, ExamSet } from "@/lib/types";
 
 /** 실기 요약 테스트 기록. 기존 200문항 진행률(edu-info-progress-v1)과 섞이지 않게 따로 이 브라우저에만 둔다. */
@@ -40,7 +41,18 @@ interface Answer {
   right: boolean;
 }
 
-export default function Exam({ goHome }: { goHome: () => void }) {
+export default function Exam({
+  goHome,
+  openWrongNote,
+  history,
+  retry,
+}: {
+  goHome: () => void;
+  openWrongNote: () => void;
+  history: Pick<HistoryApi, "log" | "fixLast">;
+  /** 오답노트에서 ‘다시 풀기’로 들어오면 이 문제들로 바로 시작 */
+  retry?: string[];
+}) {
   const [record, setRecord] = useState<ExamRecord>({ wrong: [], last: {} });
   const [scope, setScope] = useState<Scope>("all");
   const [count, setCount] = useState<Count>(20);
@@ -51,6 +63,16 @@ export default function Exam({ goHome }: { goHome: () => void }) {
   const [idx, setIdx] = useState(0);
 
   useEffect(() => setRecord(load()), []);
+
+  useEffect(() => {
+    if (!retry?.length) return;
+    const list = EXAM.filter((q) => retry.includes(q.id));
+    if (!list.length) return;
+    setRunScope("wrong");
+    setQuestions(shuffle(list));
+    setAnswers([]);
+    setIdx(0);
+  }, [retry]);
 
   const update = (fn: (r: ExamRecord) => ExamRecord) =>
     setRecord((prev) => {
@@ -75,6 +97,9 @@ export default function Exam({ goHome }: { goHome: () => void }) {
   };
 
   const submit = (q: ExamQ, input: string, right: boolean) => {
+    // 이미 채점한 문제를 ‘맞게 썼어요’로 고치면 새 기록 대신 마지막 기록을 고친다
+    if (answers[idx]) history.fixLast(`exam:${q.id}`);
+    else history.log({ key: `exam:${q.id}`, input, right });
     setAnswers((a) => {
       const next = a.slice();
       next[idx] = { input, right };
@@ -151,6 +176,9 @@ export default function Exam({ goHome }: { goHome: () => void }) {
         <button className="exam-start" onClick={() => start(scope)} disabled={n === 0}>
           시작하기 · {count ? Math.min(count, n) : n}문제
         </button>
+        <button className="nav-btn exam-note-link" onClick={openWrongNote}>
+          📒 오답노트 보기
+        </button>
       </div>
     );
   }
@@ -180,6 +208,9 @@ export default function Exam({ goHome }: { goHome: () => void }) {
             )}
             <button className="nav-btn" onClick={() => start(runScope)}>
               같은 범위 새로 풀기
+            </button>
+            <button className="nav-btn" onClick={openWrongNote}>
+              📒 오답노트
             </button>
           </div>
         </div>

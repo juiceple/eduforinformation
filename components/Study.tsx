@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { getCluster, getItem, itemsOfCluster, itemsOfSubject, segments, shuffle } from "@/lib/content";
+import type { HistoryApi } from "@/lib/history";
 import type { Item } from "@/lib/types";
 
 type Mode = "flash" | "cloze" | "quiz";
@@ -18,12 +19,14 @@ export default function Study({
   markDone,
   openItem,
   back,
+  logAttempt,
 }: {
   n: number;
   done: Record<number, boolean>;
   markDone: (n: number, known: boolean) => void;
   openItem: (n: number) => void;
   back: () => void;
+  logAttempt: HistoryApi["log"];
 }) {
   const [mode, setMode] = useState<Mode>("flash");
   const item = getItem(n)!;
@@ -78,7 +81,7 @@ export default function Study({
         {/* 항목이나 모드가 바뀌면 카드 뒤집기·빈칸·힌트·객관식 상태를 새로 시작 */}
         {mode === "flash" && <Flash key={n} item={item} />}
         {mode === "cloze" && <Cloze key={n} item={item} />}
-        {mode === "quiz" && <Quiz key={n} item={item} />}
+        {mode === "quiz" && <Quiz key={n} item={item} logAttempt={logAttempt} />}
       </div>
 
       <div className="study-foot">
@@ -244,7 +247,7 @@ function makeQuiz(item: Item): BlankQuiz | null {
   return { li, bi, answer, choices };
 }
 
-function Quiz({ item }: { item: Item }) {
+function Quiz({ item, logAttempt }: { item: Item; logAttempt: HistoryApi["log"] }) {
   const quiz = useMemo(() => makeQuiz(item), [item]);
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -274,7 +277,15 @@ function Quiz({ item }: { item: Item }) {
             {quiz.choices.map((c) => {
               const cls = !selected ? "" : c === quiz.answer ? "correct" : c === selected ? "wrong" : "dim";
               return (
-                <button key={c} className={`choice ${cls}`} disabled={!!selected} onClick={() => setSelected(c)}>
+                <button
+                  key={c}
+                  className={`choice ${cls}`}
+                  disabled={!!selected}
+                  onClick={() => {
+                    setSelected(c);
+                    logAttempt({ key: `quiz:${item.n}`, input: c, right: c === quiz.answer, li: quiz.li, answer: quiz.answer });
+                  }}
+                >
                   {c}
                   {cls === "correct" && " ✓"}
                   {cls === "wrong" && " ✗"}

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getCluster, getItem, itemsOfCluster } from "@/lib/content";
+import { useHistory, wrongEntries } from "@/lib/history";
 import { useProgress } from "@/lib/progress";
 import type { NoteDoc, SubjectId } from "@/lib/types";
 import Exam from "./Exam";
@@ -9,21 +10,24 @@ import Home from "./Home";
 import { NoteList, NoteView } from "./Notes";
 import Study from "./Study";
 import SubjectScreen from "./SubjectScreen";
+import WrongNote from "./WrongNote";
 
-/** 홈(과목) → 묶음 목록 → 학습 3단계 + 요약노트 + 실기 요약 테스트. 주소: #/ · #/s/1 · #/i/12 · #/notes · #/notes/1 · #/exam */
+/** 홈(과목) → 묶음 목록 → 학습 3단계 + 요약노트 + 실기 요약 테스트 + 오답노트. 주소: #/ · #/s/1 · #/i/12 · #/notes · #/notes/1 · #/exam · #/wrong */
 type Route =
   | { screen: "home" }
   | { screen: "subject"; id: SubjectId }
   | { screen: "study"; n: number }
   | { screen: "notes" }
   | { screen: "note"; id: number }
-  | { screen: "exam" };
+  | { screen: "exam"; retry?: string[] }
+  | { screen: "wrong" };
 
 function parseHash(): Route {
   const [kind, arg] = window.location.hash.replace(/^#\/?/, "").split("/");
   if (kind === "s" && ["1", "2", "3"].includes(arg)) return { screen: "subject", id: Number(arg) as SubjectId };
   if (kind === "i" && getItem(Number(arg))) return { screen: "study", n: Number(arg) };
   if (kind === "exam") return { screen: "exam" };
+  if (kind === "wrong") return { screen: "wrong" };
   if (kind === "notes") return arg && Number(arg) > 0 ? { screen: "note", id: Number(arg) } : { screen: "notes" };
   return { screen: "home" };
 }
@@ -32,6 +36,7 @@ function toHash(r: Route): string {
   if (r.screen === "subject") return `#/s/${r.id}`;
   if (r.screen === "study") return `#/i/${r.n}`;
   if (r.screen === "exam") return "#/exam";
+  if (r.screen === "wrong") return "#/wrong";
   if (r.screen === "notes") return "#/notes";
   if (r.screen === "note") return `#/notes/${r.id}`;
   return "#/";
@@ -39,6 +44,7 @@ function toHash(r: Route): string {
 
 export default function App({ notes }: { notes: NoteDoc[] }) {
   const { progress, ready, markDone } = useProgress();
+  const { history, log, fixLast, clear } = useHistory();
   const [route, setRoute] = useState<Route>({ screen: "home" });
 
   useEffect(() => {
@@ -49,7 +55,7 @@ export default function App({ notes }: { notes: NoteDoc[] }) {
   }, []);
 
   const go = useCallback((next: Route) => {
-    const screenChanged = next.screen !== route.screen || next.screen === "note";
+    const screenChanged = next.screen !== route.screen || next.screen === "note" || next.screen === "exam";
     setRoute(next);
     const hash = toHash(next);
     if (window.location.hash !== hash) window.history.pushState(null, "", hash);
@@ -70,12 +76,15 @@ export default function App({ notes }: { notes: NoteDoc[] }) {
 
   if (!ready) return <div className="loading">불러오는 중…</div>;
 
-  const tab = route.screen === "exam" ? "exam" : route.screen === "notes" || route.screen === "note" ? "notes" : "study";
+  const tab =
+    route.screen === "exam" ? "exam" : route.screen === "wrong" ? "wrong" : route.screen === "notes" || route.screen === "note" ? "notes" : "study";
   const tabs: { id: typeof tab; label: string; to: Route }[] = [
     { id: "study", label: "📖 학습노트", to: { screen: "home" } },
     { id: "notes", label: "🗒️ 요약노트", to: { screen: "notes" } },
     { id: "exam", label: "📝 실기 테스트", to: { screen: "exam" } },
+    { id: "wrong", label: "📒 오답노트", to: { screen: "wrong" } },
   ];
+  const wrongCount = wrongEntries(history).length;
   const note = route.screen === "note" ? notes.find((n) => n.id === route.id) : undefined;
 
   return (
@@ -95,6 +104,8 @@ export default function App({ notes }: { notes: NoteDoc[] }) {
           openItem={openItem}
           openExam={() => go({ screen: "exam" })}
           openNotes={() => go({ screen: "notes" })}
+          openWrongNote={() => go({ screen: "wrong" })}
+          wrongCount={wrongCount}
         />
       )}
       {route.screen === "subject" && (
@@ -106,7 +117,18 @@ export default function App({ notes }: { notes: NoteDoc[] }) {
           openItem={openItem}
         />
       )}
-      {route.screen === "exam" && <Exam goHome={() => go({ screen: "home" })} />}
+      {route.screen === "exam" && (
+        <Exam
+          key={route.retry ? route.retry.join() : "exam"}
+          goHome={() => go({ screen: "home" })}
+          openWrongNote={() => go({ screen: "wrong" })}
+          history={{ log, fixLast }}
+          retry={route.retry}
+        />
+      )}
+      {route.screen === "wrong" && (
+        <WrongNote history={history} clear={clear} retryExam={(ids) => go({ screen: "exam", retry: ids })} openItem={openItem} />
+      )}
       {(route.screen === "notes" || (route.screen === "note" && !note)) && (
         <NoteList notes={notes} openNote={(id) => go({ screen: "note", id })} />
       )}
@@ -119,6 +141,7 @@ export default function App({ notes }: { notes: NoteDoc[] }) {
           done={progress.done}
           markDone={markDone}
           openItem={openItem}
+          logAttempt={log}
           back={() => go({ screen: "subject", id: getCluster(getItem(route.n)!.c).subject })}
         />
       )}

@@ -13,12 +13,16 @@ export default function Home({
   openItem,
   openExam,
   openNotes,
+  openWrongNote,
+  wrongCount,
 }: {
   done: Record<number, boolean>;
   openSubject: (id: SubjectId) => void;
   openItem: (n: number) => void;
   openExam: () => void;
   openNotes: () => void;
+  openWrongNote: () => void;
+  wrongCount: number;
 }) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -45,6 +49,16 @@ export default function Home({
         <span className="result-body">
           <span className="subject-name serif">실기 총요약 요약노트 보기</span>
           <span className="subject-meta">(1) 운영체제 · (2) 네트워크 · (3) 개발환경·테스트·SQL</span>
+        </span>
+        <span className="exam-entry-go">열기 →</span>
+      </button>
+      <button className="exam-entry" onClick={openWrongNote}>
+        <span className="subject-emoji">📒</span>
+        <span className="result-body">
+          <span className="subject-name serif">오답노트</span>
+          <span className="subject-meta">
+            {wrongCount ? `다시 볼 문제 ${wrongCount}개 · ` : ""}실기 테스트 · 객관식 풀이 기록
+          </span>
         </span>
         <span className="exam-entry-go">열기 →</span>
       </button>
