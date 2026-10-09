@@ -30,9 +30,11 @@ export interface Progress {
   days: string[];
   /** 학습 화면의 ‘알아요(true) / 다시 볼게요(false)’ 표시. 없으면 아직 표시 안 함 */
   done: Record<number, boolean>;
+  /** 마지막으로 바뀐 시각(ms). 기기 간 동기화 때 더 최근 기록을 고르는 데 쓴다 */
+  savedAt: number;
 }
 
-const empty: Progress = { map: {}, days: [], done: {} };
+const empty: Progress = { map: {}, days: [], done: {}, savedAt: 0 };
 
 /** done 기록이 없던 이전 버전 데이터: 상자 2 이상은 ‘알아요’, 상자 1은 ‘다시 볼게요’로 옮긴다. */
 function migrateDone(map: ProgressMap): Record<number, boolean> {
@@ -77,24 +79,85 @@ export function isDue(s: CardState | undefined, now = Date.now()): boolean {
   return !!s && s.box > 0 && s.due <= now;
 }
 
+function normalize(parsed: Partial<Progress>): Progress {
+  const map = parsed.map ?? {};
+  return {
+    map,
+    days: parsed.days ?? [],
+    done: parsed.done ?? migrateDone(map),
+    // savedAt이 없던 이전 버전 기록은 ‘아주 오래전’으로 쳐서, 웹에 기록이 없을 때만 올라가게 한다.
+    savedAt: parsed.savedAt ?? (Object.keys(map).length > 0 ? 1 : 0),
+  };
+}
+
 function load(): Progress {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return empty;
-    const parsed = JSON.parse(raw) as Partial<Progress>;
-    const map = parsed.map ?? {};
-    return { map, days: parsed.days ?? [], done: parsed.done ?? migrateDone(map) };
+    return normalize(JSON.parse(raw) as Partial<Progress>);
   } catch {
     return empty;
   }
+}
+
+/**
+ * 웹(Supabase) 저장. 혼자 쓰는 사이트라 로그인 없이 행 하나(REMOTE_ID)에 통째로 저장한다.
+ * localStorage는 오프라인·빠른 첫 화면용 사본이고, 기기 간에는 savedAt이 더 최근인 쪽이 이긴다.
+ */
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://htxlggyucplpjhiyymkt.supabase.co";
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_KEY ?? "sb_publishable_q3rO1yp60wHw2-f1ROdfqg_MXRSQjzF";
+const REMOTE_URL = `${SUPABASE_URL}/rest/v1/edu_progress`;
+const REMOTE_ID = "me";
+const REMOTE_DELAY = 800;
+
+async function loadRemote(): Promise<Progress | null> {
+  try {
+    const res = await fetch(`${REMOTE_URL}?id=eq.${REMOTE_ID}&select=data`, {
+      headers: { apikey: SUPABASE_KEY },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as { data: Partial<Progress> }[];
+    return rows[0] ? normalize(rows[0].data) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveRemote(p: Progress) {
+  // keepalive: 탭을 닫는 순간에 보낸 저장도 끝까지 가게 한다.
+  fetch(REMOTE_URL, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: JSON.stringify({ id: REMOTE_ID, data: p, updated_at: new Date().toISOString() }),
+    keepalive: true,
+  }).catch(() => {
+    // 네트워크가 끊겨도 localStorage에는 남아 있고, 다음 저장 때 통째로 다시 올라간다.
+  });
+}
+
+let pending: Progress | null = null;
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+function flushRemote() {
+  clearTimeout(timer);
+  if (pending) saveRemote(pending);
+  pending = null;
 }
 
 function save(p: Progress) {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
   } catch {
-    // 저장소를 쓸 수 없는 환경(사생활 보호 모드 등)에서는 이번 세션 동안만 유지
+    // 저장소를 쓸 수 없는 환경(사생활 보호 모드 등)에서는 웹 저장만 쓴다
   }
+  pending = p;
+  clearTimeout(timer);
+  timer = setTimeout(flushRemote, REMOTE_DELAY);
 }
 
 export function useProgress() {
@@ -102,8 +165,32 @@ export function useProgress() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setProgress(load());
+    let alive = true;
+    const local = load();
+    setProgress(local);
     setReady(true);
+    loadRemote().then((remote) => {
+      if (!alive) return;
+      if (remote && remote.savedAt > local.savedAt) {
+        // 다른 기기에서 더 최근에 공부한 기록. 이 사이에 여기서 누른 기록이 있으면 그쪽을 남긴다.
+        setProgress((prev) => {
+          if (prev.savedAt > remote.savedAt) return prev;
+          try {
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(remote));
+          } catch {}
+          return remote;
+        });
+      } else if (local.savedAt > (remote?.savedAt ?? 0)) {
+        // 웹에 아직 안 올라간 기록(예전 버전·오프라인)이 있으면 올린다.
+        saveRemote(local);
+      }
+    });
+    window.addEventListener("pagehide", flushRemote);
+    return () => {
+      alive = false;
+      window.removeEventListener("pagehide", flushRemote);
+      flushRemote();
+    };
   }, []);
 
   const grade = useCallback((n: number, g: Grade) => {
@@ -113,6 +200,7 @@ export function useProgress() {
         ...prev,
         map: { ...prev.map, [n]: nextState(prev.map[n], g) },
         days: prev.days.includes(t) ? prev.days : [...prev.days, t].slice(-400),
+        savedAt: Date.now(),
       };
       save(next);
       return next;
@@ -127,6 +215,7 @@ export function useProgress() {
         map: { ...prev.map, [n]: nextState(prev.map[n], known ? "good" : "again") },
         days: prev.days.includes(t) ? prev.days : [...prev.days, t].slice(-400),
         done: { ...prev.done, [n]: known },
+        savedAt: Date.now(),
       };
       save(next);
       return next;
@@ -134,8 +223,10 @@ export function useProgress() {
   }, []);
 
   const reset = useCallback(() => {
-    save(empty);
-    setProgress(empty);
+    // 초기화도 다른 기기에 퍼지도록 시각을 남긴다.
+    const cleared: Progress = { ...empty, savedAt: Date.now() };
+    save(cleared);
+    setProgress(cleared);
   }, []);
 
   return { progress, ready, grade, markDone, reset };
