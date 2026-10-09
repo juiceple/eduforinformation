@@ -307,3 +307,31 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   .topnav { gap: 4px; }
   .topnav-tab { font-size: 12.5px; padding: 9px 4px; }
 }
+
+/* ── 요약노트 인쇄 ── */
+.note-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.note-print-btn { margin-top: 16px; }
+.print-only { display: none; }
+@media print {
+  @page { size: A4; margin: 14mm 12mm; }
+  html, body { background: #fff; }
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .shell { max-width: none; padding: 0; }
+  /* 메뉴 · 버튼 · 목차 · 이전/다음은 종이에 필요 없음 */
+  .topnav, .back, .nav-btn, .note-toc, .study-foot { display: none !important; }
+  /* 목록 화면에서 인쇄하면 카드 목록 대신 노트 전체를 출력 */
+  .screen:has(.print-only) > :not(.print-only) { display: none !important; }
+  .print-only { display: block; }
+  .note-print-page + .note-print-page { break-before: page; }
+  .screen { padding-top: 0; }
+  .panel.note { margin: 0; min-height: 0; border: 0; border-radius: 0; background: none; }
+  .note { padding: 0; font-size: 10.5pt; line-height: 1.65; }
+  .note h1 { font-size: 17pt; }
+  .note h2 { font-size: 13.5pt; margin: 22px 0 8px; padding-top: 10px; break-after: avoid; }
+  .note h3, .note h4 { break-after: avoid; }
+  .note table, .note tr, .note pre, .note blockquote { break-inside: avoid; }
+  .note-table { overflow: visible; }
+  .note table { font-size: 9pt; }
+  .note th { white-space: normal; }
+  .note pre { overflow: visible; white-space: pre-wrap; font-size: 9pt; }
+}
