@@ -60,8 +60,19 @@ export default function App() {
 
   if (!ready) return <div className="loading">불러오는 중…</div>;
 
+  const inExam = route.screen === "exam";
+
   return (
     <main className="shell">
+      {/* 어느 화면에서든 학습노트 ↔ 실기 테스트로 바로 이동 */}
+      <nav className="topnav" aria-label="주 메뉴">
+        <button className={`topnav-tab ${!inExam ? "on" : ""}`} onClick={() => go({ screen: "home" })} aria-current={!inExam ? "page" : undefined}>
+          📖 학습노트
+        </button>
+        <button className={`topnav-tab ${inExam ? "on" : ""}`} onClick={() => go({ screen: "exam" })} aria-current={inExam ? "page" : undefined}>
+          📝 실기 테스트
+        </button>
+      </nav>
       {route.screen === "home" && (
         <Home
           done={progress.done}

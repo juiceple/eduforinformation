@@ -250,3 +250,21 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .exam-review-item { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; }
 .exam-review-q { font-size: 14px; color: var(--ink); line-height: 1.6; margin-bottom: 8px; }
 .exam-review-a { font-size: 13.5px; }
+
+/* ── 상단 메뉴: 학습노트 ↔ 실기 테스트 ── */
+.topnav {
+  position: sticky; top: 0; z-index: 10; display: flex; gap: 6px; margin: 0 -24px; padding: 12px 24px;
+  background: var(--paper); border-bottom: 1px solid var(--line);
+}
+.topnav-tab { flex: 1; max-width: 200px; padding: 10px 14px; border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--ink-3); text-align: center; }
+.topnav-tab:hover { background: var(--tint); }
+.topnav-tab.on { background: var(--ink); color: var(--paper); }
+.home { padding-top: 32px; }
+.screen { padding-top: 24px; }
+.exam-entry { margin-top: 20px; }
+.exam-entry-go { font-size: 14px; font-weight: 700; white-space: nowrap; }
+@media (max-width: 520px) {
+  .topnav { margin: 0 -16px; padding: 10px 16px; }
+  .topnav-tab { max-width: none; }
+  .home { padding-top: 24px; }
+}

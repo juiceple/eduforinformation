@@ -30,6 +30,15 @@ export default function Home({
       <h1 className="home-title serif">정처기 학습노트</h1>
       <div className="home-sub">정보처리산업기사 핵심 200문항</div>
 
+      <button className="exam-entry" onClick={openExam}>
+        <span className="subject-emoji">📝</span>
+        <span className="result-body">
+          <span className="subject-name serif">실기 요약 테스트 풀기</span>
+          <span className="subject-meta">운영체제 · 네트워크 · 개발환경·테스트·SQL 단답형 {EXAM.length}문제</span>
+        </span>
+        <span className="exam-entry-go">시작 →</span>
+      </button>
+
       <input
         className="search"
         type="search"
@@ -81,17 +90,6 @@ export default function Home({
             );
           })}
         </div>
-      )}
-
-      {!q && (
-        <button className="exam-entry" onClick={openExam}>
-          <span className="subject-emoji">📝</span>
-          <span className="result-body">
-            <span className="subject-name serif">실기 요약 테스트</span>
-            <span className="subject-meta">운영체제 · 네트워크 · 개발환경·테스트·SQL 단답형 {EXAM.length}문제 — 200문항 학습과 별도</span>
-          </span>
-          <span className="exam-entry-go">→</span>
-        </button>
       )}
     </div>
   );
