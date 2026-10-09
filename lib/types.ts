@@ -32,3 +32,23 @@ export interface Subject {
   name: string;
   range: [number, number];
 }
+
+/** 실기 요약 테스트 범위: 1 운영체제 / 2 네트워크 / 3 개발환경·테스트·SQL */
+export type ExamSet = 1 | 2 | 3;
+
+/** 실기 요약 테스트 단답형 문제 (기존 200문항과 별개) */
+export interface ExamQ {
+  id: string;
+  set: ExamSet;
+  topic: string;
+  q: string;
+  /** 문제에 딸린 코드·표 */
+  code?: string;
+  /** 인정 답안 — 대소문자·띄어쓰기·기호 무시 */
+  a: string[];
+  /** 화면에 보여줄 모범 답안 (없으면 a[0]) */
+  show?: string;
+  /** 쉼표로 여러 개 쓰는 답에서 순서를 따지지 않음 */
+  anyOrder?: boolean;
+  ex?: string;
+}

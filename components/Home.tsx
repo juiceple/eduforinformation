@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { EXAM } from "@/lib/exam";
 import { CLUSTERS, getCluster, ITEMS, itemsOfSubject, pad, plain, SUBJECTS } from "@/lib/content";
 import type { SubjectId } from "@/lib/types";
 
@@ -10,10 +11,12 @@ export default function Home({
   done,
   openSubject,
   openItem,
+  openExam,
 }: {
   done: Record<number, boolean>;
   openSubject: (id: SubjectId) => void;
   openItem: (n: number) => void;
+  openExam: () => void;
 }) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -78,6 +81,17 @@ export default function Home({
             );
           })}
         </div>
+      )}
+
+      {!q && (
+        <button className="exam-entry" onClick={openExam}>
+          <span className="subject-emoji">📝</span>
+          <span className="result-body">
+            <span className="subject-name serif">실기 요약 테스트</span>
+            <span className="subject-meta">운영체제 · 네트워크 · 개발환경·테스트·SQL 단답형 {EXAM.length}문제 — 200문항 학습과 별도</span>
+          </span>
+          <span className="exam-entry-go">→</span>
+        </button>
       )}
     </div>
   );
