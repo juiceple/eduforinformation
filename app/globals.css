@@ -268,3 +268,42 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   .topnav-tab { max-width: none; }
   .home { padding-top: 24px; }
 }
+
+/* ── 요약노트 ── */
+.topnav-tab { padding: 10px 8px; font-size: 13.5px; }
+.note-card { margin-bottom: 10px; padding: 18px; }
+.note-toc { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+.note-toc .related-chip { font-size: 12px; padding: 6px 12px; }
+.note { padding: 28px 28px 36px; font-size: 14.5px; line-height: 1.8; color: var(--ink); }
+.note h1 { font-family: var(--serif); font-size: 22px; line-height: 1.4; margin: 0 0 16px; }
+.note h2 {
+  font-family: var(--serif); font-size: 19px; margin: 40px 0 12px; padding-top: 18px;
+  border-top: 1px solid var(--line); scroll-margin-top: 72px;
+}
+.note h3 { font-size: 16px; margin: 28px 0 10px; color: var(--ink); }
+.note h4 { font-size: 14.5px; margin: 20px 0 8px; }
+.note p { margin: 10px 0; }
+.note ul, .note ol { padding-left: 22px; margin: 8px 0; }
+.note li { margin: 3px 0; }
+.note li:has(> input[type="checkbox"]) { list-style: none; margin-left: -20px; }
+.note input[type="checkbox"] { accent-color: var(--accent); margin-right: 6px; }
+.note strong { color: var(--ink); background: linear-gradient(transparent 60%, var(--hl) 60%); }
+.note blockquote {
+  margin: 14px 0; padding: 10px 16px; background: var(--hint-bg); border-left: 3px solid var(--hint-line);
+  border-radius: 0 10px 10px 0; color: var(--hint-ink); font-size: 13.5px;
+}
+.note blockquote p { margin: 4px 0; }
+.note code { font-size: 0.9em; background: var(--tint-2); padding: 1px 5px; border-radius: 4px; }
+.note pre { background: var(--tint-3); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.6; }
+.note pre code { background: none; padding: 0; }
+.note hr { border: 0; border-top: 1px solid var(--line); margin: 28px 0; }
+.note-table { overflow-x: auto; margin: 12px 0; -webkit-overflow-scrolling: touch; }
+.note table { border-collapse: collapse; font-size: 13px; min-width: 100%; }
+.note th, .note td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+.note th { background: var(--tint); font-weight: 700; white-space: nowrap; }
+.note tr:nth-child(even) td { background: var(--tint-3); }
+@media (max-width: 520px) {
+  .note { padding: 20px 16px 28px; font-size: 14px; }
+  .topnav { gap: 4px; }
+  .topnav-tab { font-size: 12.5px; padding: 9px 4px; }
+}

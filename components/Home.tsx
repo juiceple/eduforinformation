@@ -12,11 +12,13 @@ export default function Home({
   openSubject,
   openItem,
   openExam,
+  openNotes,
 }: {
   done: Record<number, boolean>;
   openSubject: (id: SubjectId) => void;
   openItem: (n: number) => void;
   openExam: () => void;
+  openNotes: () => void;
 }) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -37,6 +39,14 @@ export default function Home({
           <span className="subject-meta">운영체제 · 네트워크 · 개발환경·테스트·SQL 단답형 {EXAM.length}문제</span>
         </span>
         <span className="exam-entry-go">시작 →</span>
+      </button>
+      <button className="exam-entry" onClick={openNotes}>
+        <span className="subject-emoji">🗒️</span>
+        <span className="result-body">
+          <span className="subject-name serif">실기 총요약 요약노트 보기</span>
+          <span className="subject-meta">(1) 운영체제 · (2) 네트워크 · (3) 개발환경·테스트·SQL</span>
+        </span>
+        <span className="exam-entry-go">열기 →</span>
       </button>
 
       <input
