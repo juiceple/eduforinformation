@@ -8,6 +8,7 @@ const NOTES: { id: number; file: string; name: string; emoji: string }[] = [
   { id: 1, file: "실기-총요약-1-운영체제.md", name: "운영체제 · 가상화 · 클라우드", emoji: "🖥️" },
   { id: 2, file: "실기-총요약-2-네트워크.md", name: "네트워크", emoji: "🌐" },
   { id: 3, file: "실기-총요약-3-개발환경-테스트-SQL.md", name: "개발환경 · 테스트 · SQL", emoji: "🗄️" },
+  { id: 4, file: "실기-총요약-4-코딩-최종점검.md", name: "코딩 최종 점검 · C · Java · Python · SQL", emoji: "💻" },
 ];
 
 const marked = new Marked({ gfm: true });
