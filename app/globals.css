@@ -297,6 +297,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .note pre { background: var(--tint-3); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.6; }
 .note pre code { background: none; padding: 0; }
 .note hr { border: 0; border-top: 1px solid var(--line); margin: 28px 0; }
+/* 예제 정답 · 해설 접기 */
+.note details { margin: 12px 0 20px; border: 1px solid var(--line); border-radius: 10px; padding: 0 16px; }
+.note details[open] { padding-bottom: 8px; }
+.note summary { cursor: pointer; padding: 10px 0; font-weight: 700; color: var(--accent); }
 .note-table { overflow-x: auto; margin: 12px 0; -webkit-overflow-scrolling: touch; }
 .note table { border-collapse: collapse; font-size: 13px; min-width: 100%; }
 .note th, .note td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }

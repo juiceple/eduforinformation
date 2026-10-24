@@ -1,9 +1,32 @@
 "use client";
 
+import { useEffect } from "react";
 import type { NoteDoc } from "@/lib/types";
+
+/** 인쇄할 때는 접어 둔 정답 · 해설(<details>)도 펼쳐서 출력하고, 끝나면 원래대로 */
+function usePrintOpensDetails() {
+  useEffect(() => {
+    let opened: HTMLDetailsElement[] = [];
+    const before = () => {
+      opened = Array.from(document.querySelectorAll<HTMLDetailsElement>(".note details:not([open])"));
+      opened.forEach((d) => (d.open = true));
+    };
+    const after = () => {
+      opened.forEach((d) => (d.open = false));
+      opened = [];
+    };
+    window.addEventListener("beforeprint", before);
+    window.addEventListener("afterprint", after);
+    return () => {
+      window.removeEventListener("beforeprint", before);
+      window.removeEventListener("afterprint", after);
+    };
+  }, []);
+}
 
 /** 요약노트 목록 */
 export function NoteList({ notes, openNote }: { notes: NoteDoc[]; openNote: (id: number) => void }) {
+  usePrintOpensDetails();
   return (
     <div className="screen">
       <h1 className="screen-title serif">🗒️ 실기 총요약 요약노트</h1>
@@ -47,6 +70,7 @@ export function NoteView({
   back: () => void;
   openNote: (id: number) => void;
 }) {
+  usePrintOpensDetails();
   const prev = notes.find((n) => n.id === note.id - 1);
   const next = notes.find((n) => n.id === note.id + 1);
   // 주소창 #은 화면 이동에 쓰므로 목차는 스크롤로 이동
